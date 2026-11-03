@@ -1,29 +1,17 @@
+USE torneoEsportsBD1;
+GO
+
 --Consultas SQL
 
 --1. Consultamos el jugador con mas cantidad de kills de un determinado equipo y los ordenamos de mayor a menor
-SELECT
-    J.nick AS Nickname,
-    P.nombre AS Nombre,
-    P.apellido AS Apellido,
-    E.nombre AS Equipo_actual,
-    SUM(AP.kills) AS Total_kills,
-    SUM(AP.deaths) AS Total_deaths,
-    SUM(AP.assists) AS Total_assits
-FROM Persona P
-INNER JOIN Jugador J ON P.id_persona = J.id_persona
-INNER JOIN Integrante_Equipo IE ON J.id_persona = IE.id_jugador
-INNER JOIN Equipo E ON IE.id_equipo = E.id_equipo
-INNER JOIN Alineacion_Partido AP ON J.id_persona = AP.id_jugador
-WHERE
-    E.nombre = 'T1'
-    AND IE.fecha_egreso IS NULL
-GROUP BY
-    J.nick, P.nombre, P.apellido, E.nombre
-HAVING
-    SUM(AP.kills) > 0
-ORDER BY
-    Total_kills DESC
-GO
+SELECT  * FROM view_estadisticasJugadoresActivos
+WHERE Equipo_actual = 'T1'
+ORDER BY Total_Kills DESC;
+
+-- esto tambien podria hacerse sin el filtro de equipo
+SELECT * FROM view_estadisticasJugadoresActivos
+ORDER BY Total_Kills DESC;
+
 
 --2. Consultamos el mvp del torneo, esto se calcula de la sig manera: el jugador con mayor mvps acumulados en todos los partidos
 --es quien ganará el premio mvp del torneo

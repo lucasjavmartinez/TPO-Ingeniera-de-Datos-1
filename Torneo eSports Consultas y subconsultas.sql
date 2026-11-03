@@ -34,6 +34,32 @@ ORDER BY
     Cantidad_MVP DESC;
 GO
 
+-- 3. Hacemos uso de la funcion fn_calcularKDA el cual calcula el kda de un jugador
+SELECT
+    AP.id_partido AS Partido,
+    J.nick as Nickname,
+    P.nombre AS Nombre,
+    P.apellido AS Apellido,
+    kills,
+    assists,
+    deaths,
+    dbo.fn_calcularKDA(kills, assists, deaths) AS KDAratio
+FROM Alineacion_Partido AP
+INNER JOIN Jugador J ON AP.id_jugador = J.id_persona
+INNER JOIN Persona P ON J.id_persona = P.id_persona
+WHERE J.nick = 'Faker';
+GO
+
+
+-- 4. Consultamos el MVP del torneo
+
+SELECT
+    nombre AS Torneo,
+    fecha_inicio,
+    dbo.fn_obtenerMVP(id_torneo) AS Jugador_MVP_Torneo
+FROM Torneo
+WHERE estado = 'Finalizado';
+
 
 --Consultas con subconsultas
 
@@ -83,4 +109,11 @@ WHERE
         FROM Inscripcion
     )
     AND DATEDIFF(DAY, E.fecha_alta, GETDATE()) > 60;
+GO
+
+-- 3. Hacemos uso de la funcion fn_calcularWinrateEquipo pasandole como parametro el equipo mediante una subconsulta
+
+SELECT dbo.fn_calcularWinrateEquipo(
+    (SELECT id_equipo FROM Equipo WHERE nombre = 'G2 Esports')
+) AS Winrate_Equipo;
 GO

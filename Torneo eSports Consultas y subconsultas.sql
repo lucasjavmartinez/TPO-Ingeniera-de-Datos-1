@@ -61,13 +61,35 @@ FROM Torneo
 WHERE estado = 'Finalizado';
 
 
+-- 5. rendimiento de equipo por partido
+SELECT
+    T.nombre AS Torneo,
+    E.nombre AS Equipo,
+    COUNT(DISTINCT Pa.id_partido) AS Partidos_Disputados,
+    SUM(AP.kills) AS Total_Kills_Equipo,
+    SUM(AP.assists) AS Total_Assists_Equipo,
+    CAST(AVG(CAST(AP.kills AS DECIMAL(5,2))) AS DECIMAL(5,2)) AS Promedio_Kills_Por_Jugador
+FROM Alineacion_Partido AP
+INNER JOIN Partido Pa ON AP.id_partido = Pa.id_partido
+INNER JOIN Torneo T ON Pa.id_torneo = T.id_torneo
+INNER JOIN Equipo E ON AP.id_equipo = E.id_equipo
+WHERE
+    Pa.estado = 'Jugado'
+GROUP BY
+    T.nombre, E.nombre
+HAVING
+    SUM(AP.kills) > 25
+    AND AVG(CAST(AP.kills AS DECIMAL(5,2))) >= 5.00
+ORDER BY
+    Total_Kills_Equipo DESC;
+GO
+
+
 --Consultas con subconsultas
 
 /*1. Consultamos los jugadores inscriptos en el torneo que cuenten con alguna sancion
 esto con la finalidad de que el organizador del evento pueda auditar y comprobar que
 los equipos que van a disputar la siguiente partida no posea ninguna sancion vigente*/
-
---la logica para que esto nunca pase se hará en sp o triggers
 
 SELECT
     T.nombre AS Torneo_activo,
@@ -116,4 +138,41 @@ GO
 SELECT dbo.fn_calcularWinrateEquipo(
     (SELECT id_equipo FROM Equipo WHERE nombre = 'G2 Esports')
 ) AS Winrate_Equipo;
+GO
+
+--pruebas de auditoria
+
+
+-- 1. Prueba de Auditoria: modificamos espectadores y consultamos el historial JSON
+UPDATE Partido SET cantidad_espectadores = 180000 WHERE id_partido = 1;
+SELECT TOP 5 id_auditoria, tabla, operacion, usuario, fecha, datos_anteriores, datos_nuevos
+FROM Auditoria
+ORDER BY id_auditoria DESC;
+GO
+
+-- 2. Prueba de Error en SP (KDA negativo - Error 50023)
+BEGIN TRY
+    EXEC sp_verificarKDA @id_partido = 5, @id_jugador = 23, @kills = -5, @deaths = 2, @assists = 4, @id_equipo = 4;
+END TRY
+BEGIN CATCH
+    SELECT ERROR_NUMBER() AS Codigo_Error, ERROR_MESSAGE() AS Mensaje_Error_Capturado;
+END CATCH;
+GO
+
+-- 3. Prueba de Error en Trigger (Inscribir equipo en un torneo que ya esta 'En curso' - Error 50001)
+BEGIN TRY
+    INSERT INTO Inscripcion (id_torneo, id_equipo) VALUES (2, 5);
+END TRY
+BEGIN CATCH
+    SELECT ERROR_NUMBER() AS Codigo_Error, ERROR_MESSAGE() AS Mensaje_Error_Capturado;
+END CATCH;
+GO
+
+-- 4. Prueba de Error en SP (Cerrar partido sin ambos equipos definidos - Error 50028)
+BEGIN TRY
+    EXEC sp_registrarResultadoPartido @id_partido = 5, @puntaje_a = 16, @puntaje_b = 10, @id_mvp_jugador = 23;
+END TRY
+BEGIN CATCH
+    SELECT ERROR_NUMBER() AS Codigo_Error, ERROR_MESSAGE() AS Mensaje_Error_Capturado;
+END CATCH;
 GO

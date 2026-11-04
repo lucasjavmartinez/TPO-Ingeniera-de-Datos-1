@@ -3,7 +3,7 @@ GO
 
 -- 1. Esta funcion busca calcular el kda de los jugadores para medir su desempeño en la partida
 
-CREATE FUNCTION fn_calcularKDA(
+CREATE OR ALTER FUNCTION fn_calcularKDA(
     @kills INT,
     @assists INT,
     @deaths INT
@@ -20,7 +20,7 @@ END;
 GO
 
 -- 2. Esta funcion busca calcular el winrate de un determinado equipo
-CREATE FUNCTION fn_calcularWinrateEquipo(
+CREATE OR ALTER FUNCTION fn_calcularWinrateEquipo(
     @id_equipo INT
 )
 RETURNS DECIMAL(5,2)
@@ -53,7 +53,7 @@ GO
 
 -- 3. Esta funcion nos devuelve al mvp del torneo
 
-CREATE FUNCTION fn_obtenerMVP(
+CREATE OR ALTER FUNCTION fn_obtenerMVP(
     @id_torneo INT
 )
 RETURNS VARCHAR(50)

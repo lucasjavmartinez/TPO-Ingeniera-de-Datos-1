@@ -21,7 +21,7 @@ CREATE TABLE Persona (
     activo BIT NOT NULL CONSTRAINT df_personaActiva DEFAULT(1),
 
     CONSTRAINT CK_Persona_mail CHECK (mail LIKE '%_@_%._%'),
-    CONSTRAINT CK_Persona_fnac CHECK (fecha_nacimiento <= CAST(GETDATE() AS DATE))--agregar luego en un trigger o sp un limite minimo de edad para inscribirse
+    CONSTRAINT CK_Persona_fnac CHECK (fecha_nacimiento <= DATEADD(YEAR, -16, CAST(GETDATE() AS DATE)))
 );
 CREATE TABLE Organizador (
     id_persona  INT NOT NULL CONSTRAINT PK_Organizador PRIMARY KEY,
@@ -41,8 +41,6 @@ CREATE TABLE Arbitro (
     
     CONSTRAINT FK_Arbitro_Persona FOREIGN KEY (id_persona) REFERENCES Persona(id_persona) ON DELETE CASCADE
 );
-
---el cambio aca es que hacemos que jugador herede de Persona
 
 CREATE TABLE Jugador (  
     id_persona INT NOT NULL CONSTRAINT PK_Jugador PRIMARY KEY,
@@ -64,11 +62,9 @@ CREATE TABLE Integrante_Equipo (
     id_equipo      INT  NOT NULL CONSTRAINT FK_Integrante_Equipo_Equipo  FOREIGN KEY REFERENCES Equipo(id_equipo) ON DELETE CASCADE,
     id_jugador     INT  NOT NULL CONSTRAINT FK_Integrante_Equipo_Jugador FOREIGN KEY REFERENCES Jugador(id_persona) ON DELETE CASCADE,
     fecha_ingreso  DATE NOT NULL CONSTRAINT DF_Integrante_ingreso DEFAULT (CAST(GETDATE() AS DATE)),
-    fecha_egreso   DATE NULL --esto para tener un historial mas detallado
+    fecha_egreso   DATE NULL, --esto para tener un historial mas detallado
 
-    --CONSTRAINT UQ_Integrante_Jugador UNIQUE (id_jugador)
-
-    --este constraint se elimina ahora pero luego con algun trigger se validara que el jugador no juegue ne dos equipos a la vez
+    CONSTRAINT CK_Integrante_fechas CHECK (fecha_egreso IS NULL OR fecha_egreso >= fecha_ingreso)--comprueba que la fecha de salida sea despues de la de entrada
 
 );
 
@@ -116,7 +112,7 @@ CREATE TABLE Partido (
     id_partido            INT IDENTITY(1,1) CONSTRAINT PK_Partido PRIMARY KEY,
     id_torneo             INT NOT NULL CONSTRAINT FK_Partido_Torneo FOREIGN KEY REFERENCES Torneo(id_torneo) ON DELETE CASCADE,
     nro_fase              INT NOT NULL,   -- 1 = primera fase; la mayor = final
-    nro_llave             INT NOT NULL,   -- posici�n del cruce dentro de la fase
+    nro_llave             INT NOT NULL,   -- posicion del cruce dentro de la fase
     id_arbitro            INT NULL CONSTRAINT FK_Partido_Arbitro FOREIGN KEY REFERENCES Arbitro(id_persona),
     id_equipo_a           INT NULL CONSTRAINT FK_Partido_EquipoA FOREIGN KEY REFERENCES Equipo(id_equipo),
     id_equipo_b           INT NULL CONSTRAINT FK_Partido_EquipoB FOREIGN KEY REFERENCES Equipo(id_equipo),
@@ -145,8 +141,13 @@ CREATE TABLE Partido (
         (id_partido_siguiente IS NULL AND lado_siguiente IS NULL)
         OR (id_partido_siguiente IS NOT NULL AND lado_siguiente IN ('A','B'))
     ),
-    CONSTRAINT CK_Partido_no_autorreferencia CHECK (id_partido_siguiente IS NULL OR id_partido_siguiente <> id_partido)
+    CONSTRAINT CK_Partido_no_autorreferencia CHECK (id_partido_siguiente IS NULL OR id_partido_siguiente <> id_partido),
+    CONSTRAINT CK_Partido_mvp CHECK (
+        (estado = 'Jugado' AND id_mvp_jugador IS NOT NULL)
+        OR (estado IN ('Pendiente', 'Cancelado') AND id_mvp_jugador IS NULL)
+    )
 );
+GO
 
 
 CREATE TABLE Alineacion_Partido (
@@ -165,7 +166,7 @@ CREATE TABLE Alineacion_Partido (
 );
 
 
-/* Premios efectivamente pagados (hecho historico como la presencia de Santos en las clases de BBDD) */
+--Premios efectivamente pagados
 
 CREATE TABLE Pago_Premio (
     id_pago     INT IDENTITY(1,1) CONSTRAINT PK_Pago_Premio PRIMARY KEY,

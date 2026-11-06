@@ -1,10 +1,7 @@
 USE torneoEsportsBD1;
 GO
 
-/*
-   1. Inscripcion (INSERT), el torneo debe estar en 'Inscripcion', no se supera el cupo y el equipo debe tener al menos 5 integrantes activos.
-   Por que trigger: cruza datos de Torneo, Inscripcion e Integrante_Equipo (un CHECK solo ve la fila propia).
-*/
+/* 1. El torneo debe estar en 'Inscripcion', no se supera el cupo y el equipo debe tener al menos 5 integrantes activos. */
 CREATE OR ALTER TRIGGER trg_Inscripcion_Validar
 ON Inscripcion
 AFTER INSERT
@@ -96,12 +93,8 @@ BEGIN
 END
 GO
 
-/* 
-   4. Partido (INSERT / UPDATE)
-   Reglas: los equipos deben estar inscriptos en ese torneo; el partido siguiente debe ser del mismo torneo y de la fase 
-   inmediata; un partido 'Jugado' tiene 5 jugadores por equipo y su MVP debe ser uno de los que jugaron.
-   (Que un partido jugado tenga MVP y que uno no jugado no lo tenga se controla con el CHECK CK_Partido_mvp.)
-*/
+/* 4. Partido (INSERT / UPDATE) Los equipos deben estar inscriptos en ese torneo; el partido siguiente debe ser del mismo torneo y de la fase 
+   inmediata; un partido 'Jugado' tiene 5 jugadores por equipo y su MVP debe ser uno de los que jugaron. */
 CREATE OR ALTER TRIGGER trg_Partido_Validar
 ON Partido
 AFTER INSERT, UPDATE
@@ -149,10 +142,7 @@ BEGIN
 END
 GO
 
-/*
-   5. Partido (UPDATE) nos da resultado inmutable, una vez cargado el resultado, no se modifica salvo que lo haga un 
-   administrador (db_owner o el rol rol_administrador, que se creara en el script de seguridad).
-*/
+/* 5. Partido (UPDATE) nos da resultado inmutable, una vez cargado el resultado, no se modifica salvo que lo haga un administrador. */
 CREATE OR ALTER TRIGGER trg_Partido_Resultado_Inmutable
 ON Partido
 AFTER UPDATE
@@ -177,10 +167,8 @@ BEGIN
 END
 GO
 
-/* 
-   6. Alineacion_Partido (INSERT), el equipo juega ese partido, el partido no esta cancelado, el jugador es integrante activo 
-   de ese equipo, no hay mas de 5 por equipo y el jugador no tiene una sancion vigente.
-*/
+/* 6. Alineacion_Partido (INSERT), el equipo juega ese partido, el partido no esta cancelado, el jugador es integrante activo 
+   de ese equipo, no hay mas de 5 por equipo y el jugador no tiene una sancion vigente. */
 CREATE OR ALTER TRIGGER trg_Alineacion_Validar
 ON Alineacion_Partido
 AFTER INSERT
@@ -284,10 +272,7 @@ BEGIN
 END
 GO
 
-/*
-   9. Integrante_Equipo (INSERT / UPDATE), un jugador no puede pertenecer a dos equipos activos al mismo tiempo
-   (solo puede tener un registro con fecha_egreso IS NULL) y debe ser una Persona activa.
-*/
+/* 9. Integrante_Equipo (INSERT / UPDATE), un jugador no puede pertenecer a dos equipos activos al mismo tiempo y debe ser una Persona activa. */
 CREATE OR ALTER TRIGGER trg_Integrante_Equipo_Validar
 ON Integrante_Equipo
 AFTER INSERT, UPDATE

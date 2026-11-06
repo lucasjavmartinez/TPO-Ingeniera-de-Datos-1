@@ -13,8 +13,7 @@ SELECT * FROM view_estadisticasJugadoresActivos
 ORDER BY Total_Kills DESC;
 
 
---2. Consultamos el mvp del torneo, esto se calcula de la sig manera: el jugador con mayor mvps acumulados en todos los partidos
---es quien ganará el premio mvp del torneo
+--2. Consultamos el mvp del torneo, esto se calcula de la sig manera: el jugador con mayor mvps acumulados en todos los partidos es quien ganará el premio mvp del torneo.
 
 SELECT TOP 1
     T.nombre AS Torneo,
@@ -87,9 +86,7 @@ GO
 
 --Consultas con subconsultas
 
-/*1. Consultamos los jugadores inscriptos en el torneo que cuenten con alguna sancion
-esto con la finalidad de que el organizador del evento pueda auditar y comprobar que
-los equipos que van a disputar la siguiente partida no posea ninguna sancion vigente*/
+/*1. Consultamos los jugadores inscriptos en el torneo que cuenten con alguna sancion esto con la finalidad de que el organizador del evento pueda auditar. */
 
 SELECT
     T.nombre AS Torneo_activo,
@@ -113,9 +110,7 @@ WHERE
     );
 GO
 
-/*2. Consultamos los equipos que llevan al menos 60 dias inactivos con la idea de borrarlos de la bd, 
-esto para asegurarnos de que la base de datos no acumule equipos 
-El equipo que tenga mas de 60 dias de participar de algun torneo es considerado equipo fantasma y deberia borrarse*/
+/*2. Consultamos los equipos que llevan al menos 60 dias inactivos con la idea de borrarlos de la bd, esto para asegurarnos de que la base de datos no acumule equipos.*/
 
 SELECT
     E.nombre AS Equipo_inactivo,

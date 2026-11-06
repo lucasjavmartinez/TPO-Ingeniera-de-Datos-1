@@ -23,6 +23,7 @@ AFTER INSERT, UPDATE, DELETE
 AS
 BEGIN
     SET NOCOUNT ON;
+    IF NOT EXISTS (SELECT 1 FROM inserted) AND NOT EXISTS (SELECT 1 FROM deleted) RETURN;
  
     INSERT INTO Auditoria (tabla, operacion, datos_anteriores, datos_nuevos)
     SELECT 'Partido',
@@ -33,7 +34,7 @@ BEGIN
            (SELECT * FROM inserted FOR JSON PATH);
 END
 GO
- 
+
 -- Trigger de auditoria sobre Inscripcion
 CREATE OR ALTER TRIGGER trg_Auditoria_Inscripcion
 ON Inscripcion
@@ -41,6 +42,7 @@ AFTER INSERT, UPDATE, DELETE
 AS
 BEGIN
     SET NOCOUNT ON;
+    IF NOT EXISTS (SELECT 1 FROM inserted) AND NOT EXISTS (SELECT 1 FROM deleted) RETURN;
  
     INSERT INTO Auditoria (tabla, operacion, datos_anteriores, datos_nuevos)
     SELECT 'Inscripcion',
@@ -59,6 +61,7 @@ AFTER INSERT, UPDATE, DELETE
 AS
 BEGIN
     SET NOCOUNT ON;
+    IF NOT EXISTS (SELECT 1 FROM inserted) AND NOT EXISTS (SELECT 1 FROM deleted) RETURN;
  
     INSERT INTO Auditoria (tabla, operacion, datos_anteriores, datos_nuevos)
     SELECT 'Pago_Premio',
@@ -68,11 +71,4 @@ BEGIN
            (SELECT * FROM deleted  FOR JSON PATH),
            (SELECT * FROM inserted FOR JSON PATH);
 END
-GO
- 
-/* PRUEBA PARA MODIFICAR ALGO Y VER COMO QUEDA EN EL REGISTRO */
-UPDATE Partido SET cantidad_espectadores = 1000 WHERE id_partido = 1;
-SELECT TOP 5 id_auditoria, tabla, operacion, usuario, fecha, datos_anteriores, datos_nuevos
-FROM Auditoria
-ORDER BY id_auditoria DESC;
 GO

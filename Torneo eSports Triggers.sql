@@ -1,16 +1,7 @@
-/* 
-TRIGGERS - Torneo eSports
-Ejecutar DESPUES de Creacion_Tablas e Insert_datos.
-*/
-
 USE torneoEsportsBD1;
 GO
 
-/* ------------------------------------------------------------
-   1. Inscripcion (INSERT)
-   Reglas: el torneo debe estar en 'Inscripcion', no se supera el cupo y el equipo debe tener al menos 5 integrantes activos.
-   Por que trigger: cruza datos de Torneo, Inscripcion e Integrante_Equipo (un CHECK solo ve la fila propia).
-   ------------------------------------------------------------ */
+/* 1. El torneo debe estar en 'Inscripcion', no se supera el cupo y el equipo debe tener al menos 5 integrantes activos. */
 CREATE OR ALTER TRIGGER trg_Inscripcion_Validar
 ON Inscripcion
 AFTER INSERT
@@ -27,22 +18,24 @@ BEGIN
         THROW 50001, 'Solo se pueden inscribir equipos en torneos en estado Inscripcion.', 1;
     END
 
-    IF EXISTS (SELECT 1
-               FROM Torneo t
-               WHERE t.id_torneo IN (SELECT id_torneo FROM inserted)
-                 AND (SELECT COUNT(*) FROM Inscripcion x WHERE x.id_torneo = t.id_torneo) > t.cantidad_equipos)
+     IF EXISTS (SELECT 1
+                FROM Torneo t
+                WHERE t.id_torneo IN (SELECT id_torneo FROM inserted)
+                AND (SELECT COUNT(*) FROM Inscripcion x WHERE x.id_torneo = t.id_torneo AND x.estado <> 'Descalificado') > t.cantidad_equipos)
     BEGIN
         ROLLBACK TRANSACTION;
         THROW 50002, 'El torneo ya alcanzo su cupo de equipos.', 1;
     END
 
-    -- RN01: minimo 5 integrantes (cambiar "< 5" por "<> 5" si se exige exactamente 5)
+    -- los integrantes deben de tener estado 'activo'
     IF EXISTS (SELECT 1
                FROM inserted i
                WHERE (SELECT COUNT(*)
                       FROM Integrante_Equipo ie
+                      INNER JOIN Persona p ON p.id_persona = ie.id_jugador
                       WHERE ie.id_equipo = i.id_equipo
-                        AND ie.fecha_egreso IS NULL) < 5)
+                        AND ie.fecha_egreso IS NULL
+                        AND p.activo = 1) < 5)
     BEGIN
         ROLLBACK TRANSACTION;
         THROW 50003, 'El equipo debe tener al menos 5 integrantes activos para inscribirse.', 1;
@@ -50,10 +43,8 @@ BEGIN
 END
 GO
 
-/* ------------------------------------------------------------
-   2. Inscripcion (UPDATE de estado)
-   Regla: no se puede descalificar a un equipo que ya jugo un partido.
-   ------------------------------------------------------------ */
+   -- 2. Inscripcion (UPDATE de estado), no se puede descalificar a un equipo que ya jugo un partido.
+   
 CREATE OR ALTER TRIGGER trg_Inscripcion_Descalificacion
 ON Inscripcion
 AFTER UPDATE
@@ -79,10 +70,8 @@ BEGIN
 END
 GO
 
-/* ------------------------------------------------------------
-   3. Torneo (UPDATE de estado)
-   Regla: un torneo solo pasa a 'En curso' con el cupo completo.
-   ------------------------------------------------------------ */
+   -- 3. Torneo (UPDATE de estado), un torneo solo pasa a 'En curso' con el cupo completo.
+
 CREATE OR ALTER TRIGGER trg_Torneo_Estado
 ON Torneo
 AFTER UPDATE
@@ -91,12 +80,12 @@ BEGIN
     SET NOCOUNT ON;
 
     IF UPDATE(estado)
-       AND EXISTS (SELECT 1
-                   FROM inserted i
-                   INNER JOIN deleted d ON d.id_torneo = i.id_torneo
-                   WHERE i.estado = 'En curso'
-                     AND d.estado <> 'En curso'
-                     AND (SELECT COUNT(*) FROM Inscripcion x WHERE x.id_torneo = i.id_torneo) <> i.cantidad_equipos)
+        AND EXISTS (SELECT 1
+            FROM inserted i
+            INNER JOIN deleted d ON d.id_torneo = i.id_torneo
+            WHERE i.estado = 'En curso'
+                AND d.estado <> 'En curso'
+                AND (SELECT COUNT(*) FROM Inscripcion x WHERE x.id_torneo = i.id_torneo AND x.estado = 'Activo') <> i.cantidad_equipos)
     BEGIN
         ROLLBACK TRANSACTION;
         THROW 50005, 'El torneo no puede iniciar: la cantidad de equipos inscriptos no coincide con el cupo.', 1;
@@ -104,12 +93,8 @@ BEGIN
 END
 GO
 
-/* ------------------------------------------------------------
-   4. Partido (INSERT / UPDATE)
-   Reglas: los equipos deben estar inscriptos en ese torneo; el partido siguiente debe ser del mismo torneo y de la fase 
-   inmediata; un partido 'Jugado' tiene 5 jugadores por equipo y su MVP debe ser uno de los que jugaron.
-   (Que un partido jugado tenga MVP y que uno no jugado no lo tenga se controla con el CHECK CK_Partido_mvp.)
-   ------------------------------------------------------------ */
+/* 4. Partido (INSERT / UPDATE) Los equipos deben estar inscriptos en ese torneo; el partido siguiente debe ser del mismo torneo y de la fase 
+   inmediata; un partido 'Jugado' tiene 5 jugadores por equipo y su MVP debe ser uno de los que jugaron. */
 CREATE OR ALTER TRIGGER trg_Partido_Validar
 ON Partido
 AFTER INSERT, UPDATE
@@ -157,11 +142,7 @@ BEGIN
 END
 GO
 
-/* ------------------------------------------------------------
-   5. Partido (UPDATE) - resultado inmutable
-   Regla: una vez cargado el resultado, no se modifica salvo que lo haga un administrador 
-   (db_owner o el rol rol_administrador, que se creara en el script de seguridad).
-   ------------------------------------------------------------ */
+/* 5. Partido (UPDATE) nos da resultado inmutable, una vez cargado el resultado, no se modifica salvo que lo haga un administrador. */
 CREATE OR ALTER TRIGGER trg_Partido_Resultado_Inmutable
 ON Partido
 AFTER UPDATE
@@ -186,11 +167,8 @@ BEGIN
 END
 GO
 
-/* ------------------------------------------------------------
-   6. Alineacion_Partido (INSERT)
-   Reglas: el equipo juega ese partido, el partido no esta cancelado, el jugador es integrante activo de ese equipo, 
-   no hay mas de 5 por equipo y el jugador no tiene una sancion vigente.
-   ------------------------------------------------------------ */
+/* 6. Alineacion_Partido (INSERT), el equipo juega ese partido, el partido no esta cancelado, el jugador es integrante activo 
+   de ese equipo, no hay mas de 5 por equipo y el jugador no tiene una sancion vigente. */
 CREATE OR ALTER TRIGGER trg_Alineacion_Validar
 ON Alineacion_Partido
 AFTER INSERT
@@ -218,13 +196,16 @@ BEGIN
 
     IF EXISTS (SELECT 1
                FROM inserted i
-               WHERE NOT EXISTS (SELECT 1 FROM Integrante_Equipo ie
+               WHERE NOT EXISTS (SELECT 1 
+                                 FROM Integrante_Equipo ie
+                                 INNER JOIN Persona p ON p.id_persona = ie.id_jugador
                                  WHERE ie.id_equipo = i.id_equipo
                                    AND ie.id_jugador = i.id_jugador
-                                   AND ie.fecha_egreso IS NULL))
+                                   AND ie.fecha_egreso IS NULL
+                                   AND p.activo = 1))
     BEGIN
         ROLLBACK TRANSACTION;
-        THROW 50012, 'El jugador no es integrante activo del equipo indicado.', 1;
+        THROW 50012, 'El jugador no es integrante activo del equipo indicado o fue dado de baja.', 1;
     END
 
     IF EXISTS (SELECT 1
@@ -241,7 +222,7 @@ BEGIN
                FROM inserted i
                INNER JOIN Partido p ON p.id_partido = i.id_partido
                INNER JOIN Sancion s ON s.id_jugador = i.id_jugador
-               WHERE COALESCE(CAST(p.fecha_hora AS DATE), CAST(GETDATE() AS DATE))
+               WHERE ISNULL(CAST(p.fecha_hora AS DATE), CAST(GETDATE() AS DATE))
                      BETWEEN s.fecha_inicio AND s.fecha_fin)
     BEGIN
         ROLLBACK TRANSACTION;
@@ -250,11 +231,9 @@ BEGIN
 END
 GO
 
-/* ------------------------------------------------------------
-   7. Jugador (INSERT)
-   Regla: edad minima para registrarse como jugador.
-   PENDIENTE: confirmar la edad minima (aca 16 anios).
-   ------------------------------------------------------------ */
+
+   -- 7. Jugador (INSERT), edad minima para registrarse como jugador.
+
 CREATE OR ALTER TRIGGER trg_Jugador_Edad
 ON Jugador
 AFTER INSERT
@@ -273,10 +252,8 @@ BEGIN
 END
 GO
 
-/* ------------------------------------------------------------
-   8. Pago_Premio (INSERT)
-   Regla: solo se pagan premios de torneos finalizados.
-   ------------------------------------------------------------ */
+   --8. Pago_Premio (INSERT), solo se pagan premios de torneos finalizados.
+   
 CREATE OR ALTER TRIGGER trg_PagoPremio_Validar
 ON Pago_Premio
 AFTER INSERT
@@ -291,6 +268,38 @@ BEGIN
     BEGIN
         ROLLBACK TRANSACTION;
         THROW 50016, 'Solo se pueden pagar premios de torneos finalizados.', 1;
+    END
+END
+GO
+
+/* 9. Integrante_Equipo (INSERT / UPDATE), un jugador no puede pertenecer a dos equipos activos al mismo tiempo y debe ser una Persona activa. */
+CREATE OR ALTER TRIGGER trg_Integrante_Equipo_Validar
+ON Integrante_Equipo
+AFTER INSERT, UPDATE
+AS
+BEGIN
+    SET NOCOUNT ON;
+
+    -- Validamos que el jugador no este dado de baja logica en Persona
+    IF EXISTS (SELECT 1
+               FROM inserted i
+               INNER JOIN Persona p ON p.id_persona = i.id_jugador
+               WHERE p.activo = 0)
+    BEGIN
+        ROLLBACK TRANSACTION;
+        THROW 50036, 'No se puede asignar a un equipo un jugador dado de baja en el sistema.', 1;
+    END
+
+    -- Validamos que el jugador no figure como miembro activo (fecha_egreso IS NULL) en mas de un registro
+    IF EXISTS (SELECT 1
+               FROM Integrante_Equipo ie
+               WHERE ie.id_jugador IN (SELECT id_jugador FROM inserted WHERE fecha_egreso IS NULL)
+                 AND ie.fecha_egreso IS NULL
+               GROUP BY ie.id_jugador
+               HAVING COUNT(*) > 1)
+    BEGIN
+        ROLLBACK TRANSACTION;
+        THROW 50037, 'El jugador ya se encuentra activo en un equipo. Debe registrarse su fecha de egreso antes de sumarlo a otro.', 1;
     END
 END
 GO
